@@ -126,76 +126,116 @@ class LongMethodDetector:
         return complexity
 
 class GodClassDetector:
-    """Detects classes with too many responsibilities."""
+    """Detect God Class (Blob) using ATFD/WMC/TCC criteria.
+    Detection rule (Marinescu): (ATFD > Few) AND (WMC >= Very High) AND (TCC < One Third)
+    - ATFD (Access To Foreign Data): count of foreign attribute accesses across class methods
+    - WMC  (Weighted Method Count): sum of cyclomatic complexities of all methods
+    - TCC  (Tight Class Cohesion): fraction of method pairs that share at least one self field
+    """
     
     def __init__(self, config: Dict[str, Any]):
-        self.max_methods = config.get('max_methods', 20)
-        self.max_fields = config.get('max_fields', 15)
-        self.max_coupling = config.get('max_coupling', 15)
+        # Threshold defaults from literature; allow override via config
+        self.atfd_few = config.get('atfd_few', 5)              # Few ∈ [2..5]; choose upper bound 5 by default
+        self.wmc_very_high = config.get('wmc_very_high', 47)    # Very High (per metrics-in-practice)
+        self.tcc_one_third = config.get('tcc_one_third', 0.33)  # One Third
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
         
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                methods = []
-                fields = set()
-                external_dependencies = set()
-                
-                # Count methods and analyze dependencies
-                for item in node.body:
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        methods.append(item.name)
-                        
-                        # Analyze method for external dependencies
-                        for child in ast.walk(item):
-                            if isinstance(child, ast.Attribute):
-                                if isinstance(child.value, ast.Name) and child.value.id != 'self':
-                                    external_dependencies.add(child.value.id)
-                    
-                    elif isinstance(item, ast.Assign):
-                        for target in item.targets:
-                            if isinstance(target, ast.Name):
-                                fields.add(target.id)
-                
-                # Check for __init__ method to count instance variables
-                for method in node.body:
-                    if isinstance(method, ast.FunctionDef) and method.name == '__init__':
-                        for child in ast.walk(method):
-                            if isinstance(child, ast.Assign):
-                                for target in child.targets:
-                                    if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name) and target.value.id == 'self':
-                                        fields.add(target.attr)
-                
-                method_count = len(methods)
-                field_count = len(fields)
-                coupling = len(external_dependencies)
-                
-                if method_count > self.max_methods or field_count > self.max_fields or coupling > self.max_coupling:
-                    severity = "high" if method_count > self.max_methods * 1.5 else "medium"
-                    
-                    results.append(SmellResult(
-                        smell_type="GodClass",
-                        file_path=file_path,
-                        line_start=node.lineno,
-                        line_end=node.end_lineno or node.lineno,
-                        severity=severity,
-                        message=f"Class '{node.name}' has too many responsibilities (Methods: {method_count}, Fields: {field_count}, Coupling: {coupling})",
-                        details={
-                            'class_name': node.name,
-                            'method_count': method_count,
-                            'field_count': field_count,
-                            'coupling': coupling,
-                            'methods': methods,
-                            'thresholds': {
-                                'max_methods': self.max_methods,
-                                'max_fields': self.max_fields,
-                                'max_coupling': self.max_coupling
-                            }
-                        }
-                    ))
+        for class_node in ast.walk(tree):
+            if not isinstance(class_node, ast.ClassDef):
+                continue
+            
+            method_nodes: List[ast.AST] = []
+            # For each method, track self attributes used (for TCC) and complexity (for WMC)
+            method_self_attrs: Dict[str, Set[str]] = {}
+            wmc_sum = 0
+            atfd_count = 0
+            
+            for item in class_node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    method_nodes.append(item)
+                    # Compute cyclomatic complexity for WMC
+                    wmc_sum += self._cyclomatic_complexity(item)
+                    # Collect self attrs used by this method
+                    self_attrs: Set[str] = set()
+                    for n in ast.walk(item):
+                        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+                            if n.value.id == 'self':
+                                # self.<attr>
+                                self_attrs.add(n.attr)
+                            else:
+                                # foreign_obj.<attr> contributes to ATFD
+                                atfd_count += 1
+                    method_self_attrs[item.name] = self_attrs
+            
+            # Compute TCC: proportion of method pairs that share at least one self field
+            tcc = self._compute_tcc(method_self_attrs)
+            
+            # Apply rule: (ATFD > Few) AND (WMC >= Very High) AND (TCC < One Third)
+            if atfd_count > self.atfd_few and wmc_sum >= self.wmc_very_high and tcc < self.tcc_one_third:
+                results.append(SmellResult(
+                    smell_type="GodClass",
+                    file_path=file_path,
+                    line_start=class_node.lineno,
+                    line_end=class_node.end_lineno or class_node.lineno,
+                    severity="high",
+                    message=(
+                        f"Class '{class_node.name}' flagged as God Class "
+                        f"(ATFD={atfd_count} > {self.atfd_few}, "
+                        f"WMC={wmc_sum} >= {self.wmc_very_high}, "
+                        f"TCC={tcc:.2f} < {self.tcc_one_third})"
+                    ),
+                    details={
+                        'class_name': class_node.name,
+                        'metrics': {
+                            'ATFD': atfd_count,
+                            'WMC': wmc_sum,
+                            'TCC': tcc,
+                        },
+                        'thresholds': {
+                            'ATFD_Few': self.atfd_few,
+                            'WMC_Very_High': self.wmc_very_high,
+                            'TCC_One_Third': self.tcc_one_third,
+                        },
+                        'methods': [m.name for m in method_nodes],
+                    }
+                ))
         
         return results
+    
+    def _cyclomatic_complexity(self, func_node: ast.AST) -> int:
+        """Compute cyclomatic complexity for a single function/method.
+        Mirrors the logic used in LongMethodDetector for consistency.
+        """
+        complexity = 1
+        for child in ast.walk(func_node):
+            if isinstance(child, (ast.If, ast.While, ast.For, ast.AsyncFor)):
+                complexity += 1
+            elif isinstance(child, ast.ExceptHandler):
+                complexity += 1
+            elif isinstance(child, (ast.With, ast.AsyncWith)):
+                complexity += 1
+            elif isinstance(child, ast.BoolOp):
+                complexity += max(0, len(child.values) - 1)
+        return complexity
+    
+    def _compute_tcc(self, method_self_attrs: Dict[str, Set[str]]) -> float:
+        """Compute TCC = connected_method_pairs / total_method_pairs.
+        Two methods are connected if they share at least one self field accessed.
+        If fewer than 2 methods, define TCC = 1.0 (trivially cohesive).
+        """
+        names = list(method_self_attrs.keys())
+        n = len(names)
+        if n < 2:
+            return 1.0
+        total_pairs = n * (n - 1) // 2
+        connected = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                if method_self_attrs[names[i]] & method_self_attrs[names[j]]:
+                    connected += 1
+        return connected / total_pairs if total_pairs > 0 else 1.0
 
 class DuplicatedCodeDetector:
     """Detects duplicated code blocks."""
@@ -379,27 +419,34 @@ class MagicNumbersDetector:
         return results
 
 class FeatureEnvyDetector:
-    """Detects methods that use other classes' data more than their own."""
+    """Detect Feature Envy using ATFD, LAA, and FDP metrics (Marinescu, 2004).
+    - ATFD (Access to Foreign Data): total number of foreign attribute accesses
+    - LAA (Locality of Attribute Accesses): self_accesses / (self_accesses + foreign_accesses)
+    - FDP (Foreign Data Providers): number of distinct foreign objects accessed
+    A method is flagged if: ATFD > atfd_threshold AND LAA < laa_threshold AND FDP >= fdp_threshold.
+    """
     
     def __init__(self, config: Dict[str, Any]):
+        # Minimum method size in lines (non-empty, non-comment) to consider
         self.min_sloc = config.get('min_sloc', 10)
-        self.foreign_access_ratio = config.get('foreign_access_ratio', 1.5)
-        self.min_foreign_accesses = config.get('min_foreign_accesses', 3)
+        # Thresholds for the three metrics (defaults from literature)
+        self.atfd_threshold = config.get('atfd_threshold', 5)
+        self.laa_threshold = config.get('laa_threshold', 0.33)
+        self.fdp_threshold = config.get('fdp_threshold', 2)
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
         
-        # Find all classes and their methods
+        # Build a map of class name -> { node, methods[], fields{} }
         classes = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 classes[node.name] = {
                     'node': node,
                     'methods': [],
-                    'fields': set()
+                    'fields': set(),
                 }
-                
-                # Collect class methods and fields
+                # Collect class-level methods and fields
                 for item in node.body:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         classes[node.name]['methods'].append(item)
@@ -408,62 +455,69 @@ class FeatureEnvyDetector:
                             if isinstance(target, ast.Name):
                                 classes[node.name]['fields'].add(target.id)
         
-        # Analyze each method for feature envy
+        # Evaluate each method in each class
         for class_name, class_info in classes.items():
             for method in class_info['methods']:
+                # Skip constructor
                 if method.name == '__init__':
                     continue
                 
-                # Count lines of code
+                # Compute SLOC for the method (non-empty, non-comment lines only)
                 lines = source_code.split('\n')
                 start_line = method.lineno
                 end_line = method.end_lineno or start_line
-                
                 sloc = 0
                 for i in range(start_line - 1, min(end_line, len(lines))):
-                    line = lines[i].strip()
-                    if line and not line.startswith('#'):
+                    stripped = lines[i].strip()
+                    if stripped and not stripped.startswith('#'):
                         sloc += 1
-                
                 if sloc < self.min_sloc:
                     continue
                 
-                # Count self vs foreign accesses
+                # Count attribute accesses: self vs foreign (other variables)
                 self_accesses = 0
-                foreign_accesses = defaultdict(int)
-                
+                foreign_accesses = defaultdict(int)  # base_name -> count
                 for node in ast.walk(method):
-                    if isinstance(node, ast.Attribute):
-                        if isinstance(node.value, ast.Name):
-                            if node.value.id == 'self':
-                                self_accesses += 1
-                            else:
-                                foreign_accesses[node.value.id] += 1
+                    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                        if node.value.id == 'self':
+                            self_accesses += 1
+                        else:
+                            foreign_accesses[node.value.id] += 1
                 
-                total_foreign = sum(foreign_accesses.values())
+                # Compute metrics
+                atfd = sum(foreign_accesses.values())
+                total_accesses = self_accesses + atfd
+                laa = (self_accesses / total_accesses) if total_accesses > 0 else 0.0
+                fdp = len(foreign_accesses)
                 
-                if (total_foreign >= self.min_foreign_accesses and 
-                    self_accesses > 0 and 
-                    total_foreign / self_accesses >= self.foreign_access_ratio):
-                    
+                # Apply thresholds from Marinescu's rules
+                if atfd > self.atfd_threshold and laa < self.laa_threshold and fdp >= self.fdp_threshold:
                     most_envied = max(foreign_accesses.items(), key=lambda x: x[1]) if foreign_accesses else ("unknown", 0)
-                    
                     results.append(SmellResult(
                         smell_type="FeatureEnvy",
                         file_path=file_path,
                         line_start=start_line,
                         line_end=end_line,
                         severity="medium",
-                        message=f"Method '{method.name}' in class '{class_name}' shows feature envy (foreign: {total_foreign}, self: {self_accesses})",
+                        message=(
+                            f"Method '{method.name}' in class '{class_name}' shows Feature Envy "
+                            f"(ATFD={atfd}, LAA={laa:.2f}, FDP={fdp})"
+                        ),
                         details={
                             'method_name': method.name,
                             'class_name': class_name,
-                            'self_accesses': self_accesses,
-                            'foreign_accesses': total_foreign,
+                            'sloc': sloc,
+                            'atfd': atfd,
+                            'laa': laa,
+                            'fdp': fdp,
                             'most_envied_class': most_envied[0],
                             'most_envied_count': most_envied[1],
-                            'ratio': total_foreign / self_accesses if self_accesses > 0 else float('inf'),
-                            'threshold_ratio': self.foreign_access_ratio
+                            'thresholds': {
+                                'min_sloc': self.min_sloc,
+                                'atfd_threshold': self.atfd_threshold,
+                                'laa_threshold': self.laa_threshold,
+                                'fdp_threshold': self.fdp_threshold,
+                            },
                         }
                     ))
         
