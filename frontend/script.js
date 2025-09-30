@@ -29,6 +29,25 @@ const config = {
   },
 }
 
+// Helper to format threshold keys for display
+const formatThresholdKey = (key) => {
+  let formatted = key.replace(/_/g, ' ');
+  formatted = formatted.replace(/\b(\w)/g, (char) => char.toUpperCase()); // Capitalize first letter of each word
+
+  // Expand common abbreviations
+  formatted = formatted.replace('Sloc', 'Source Lines Of Code');
+  formatted = formatted.replace('Atfd', 'Access To Foreign Data');
+  formatted = formatted.replace('Fdp', 'Foreign Data Providers');
+  formatted = formatted.replace('Laa', 'Locality Of Attribute Accesses');
+
+  // Specific replacement for the requested change
+  if (key === 'min_sloc') { // Assuming 'min_sloc' is the raw key for "Min Source Lines Of Code"
+    return 'Source Lines Of Code Threshold';
+  }
+
+  return formatted;
+};
+
 // Initialize the application after the HTML is ready
 // - Sets up icons
 // - Wires up all event listeners for tabs, file upload, analyze button, and config inputs
@@ -168,7 +187,7 @@ function getThresholdKey(inputId) {
     "long-method-sloc": "longMethodSloc",
     "god-class-methods": "godClassMethods",
     "large-param-list": "largeParameterList",
-    "magic-numbers": "magicNumberOccurrences",
+    "magic-numbers": "magicNumberOccurrences"
   }
   return mapping[inputId]
 }
@@ -441,33 +460,146 @@ function createSmellItem(smell, index) {
                 ${smell.severity.toUpperCase()}
             </span>
         </div>
-        ${smell.details && Object.keys(smell.details).length > 0 ? createSmellDetails(smell.details) : ""}
+        ${smell.details && Object.keys(smell.details).length > 0 ? createSmellDetails(smell.details, 0, smell.smell_type) : ""}
     `
 
   return smellItem
 }
 
 // Create smell details section
-function createSmellDetails(details) {
-  const detailItems = Object.entries(details)
-    .map(
-      ([key, value]) => `
-        <div class="smell-detail-item">
-            <span class="smell-detail-key">${key}:</span>
+function createSmellDetails(details, indent = 0, currentSmellType = null) {
+  const indentStyle = `padding-left: ${indent * 1.5}rem;`;
+
+  let orderedDetailsHtml = [];
+  let thresholdsHtml = '';
+  const otherDetails = { ...details };
+
+  // Prioritize class_name
+  if (otherDetails.class_name) {
+    orderedDetailsHtml.push(`
+      <div class="smell-detail-item" style="${indentStyle}">
+          <span class="smell-detail-key">${formatThresholdKey('class_name')}:</span>
+          <span class="smell-detail-value">${String(otherDetails.class_name)}</span>
+      </div>
+    `);
+    delete otherDetails.class_name;
+  }
+
+  // Then method_name
+  if (otherDetails.method_name) {
+    orderedDetailsHtml.push(`
+      <div class="smell-detail-item" style="${indentStyle}">
+          <span class="smell-detail-key">${formatThresholdKey('method_name')}:</span>
+          <span class="smell-detail-value">${String(otherDetails.method_name)}</span>
+      </div>
+    `);
+    delete otherDetails.method_name;
+  }
+
+  // Consolidate specific thresholds into the 'thresholds' object if they exist at the top level
+  if (otherDetails.complexity_threshold !== undefined) {
+    if (!otherDetails.thresholds) otherDetails.thresholds = {};
+    otherDetails.thresholds.complexity_threshold = otherDetails.complexity_threshold;
+    delete otherDetails.complexity_threshold;
+  }
+  if (otherDetails.sloc_threshold !== undefined) {
+    if (!otherDetails.thresholds) otherDetails.thresholds = {};
+    otherDetails.thresholds.sloc_threshold = otherDetails.sloc_threshold;
+    delete otherDetails.sloc_threshold;
+  }
+  if (otherDetails.parameter_count !== undefined && otherDetails.threshold !== undefined) {
+    if (!otherDetails.thresholds) otherDetails.thresholds = {};
+    otherDetails.thresholds.large_parameter_list_threshold = otherDetails.threshold;
+    delete otherDetails.threshold;
+  }
+  // Consolidate magic number threshold
+  if (otherDetails.number !== undefined && otherDetails.threshold !== undefined && currentSmellType === "MagicNumbers") {
+    if (!otherDetails.thresholds) otherDetails.thresholds = {};
+    otherDetails.thresholds.magic_number_threshold = otherDetails.threshold;
+    delete otherDetails.threshold;
+  }
+
+  // Handle thresholds separately in a collapsible section
+  if (otherDetails.thresholds && typeof otherDetails.thresholds === 'object' && Object.keys(otherDetails.thresholds).length > 0 && !Array.isArray(otherDetails.thresholds)) {
+    const innerThresholdDetailsHtml = Object.entries(otherDetails.thresholds)
+      .map(([key, value]) => `
+        <div class="smell-detail-item" style="padding-left: ${indent + 1 * 1.5}rem;">
+            <span class="smell-detail-key">${formatThresholdKey(key)}:</span>
             <span class="smell-detail-value">${String(value)}</span>
         </div>
-    `,
-    )
-    .join("")
+      `)
+      .join('');
 
-  return `
+    thresholdsHtml = `
+      <details class="smell-thresholds-details" style="${indentStyle}">
+          <summary class="smell-thresholds-summary">Thresholds</summary>
+          <div class="smell-thresholds-content">
+              ${innerThresholdDetailsHtml}
+          </div>
+      </details>
+    `;
+    delete otherDetails.thresholds;
+  }
+
+  // Remaining metrics
+  const otherMetricsHtml = Object.entries(otherDetails)
+    .map(([key, value]) => {
+      let formattedValue = '';
+      let isNested = false;
+      let formattedKey = '';
+
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        formattedValue = createSmellDetails(value, indent + 1);
+        isNested = true;
+      } else if (Array.isArray(value)) {
+        if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && key === 'locations') {
+          formattedValue = value.map(item => {
+            const line = item.line ? `${item.line}` : '';
+            if (line) return line;
+            return '[Unknown Line]';
+          }).join(', ');
+          formattedKey = formatThresholdKey(key) + ' (Line Number)'; // Modify key for display
+        } else {
+          formattedValue = value.map(item => String(item)).join(', ');
+          formattedKey = formatThresholdKey(key);
+        }
+      } else {
+        if (key === 'locality_of_attribute_accesses' && typeof value === 'number') {
+          formattedValue = value.toFixed(3);
+        } else {
+          formattedValue = String(value);
+        }
+        formattedKey = formatThresholdKey(key);
+      }
+
+      return `
+        <div class="smell-detail-item" style="${indentStyle}">
+            <span class="smell-detail-key">${formattedKey}:</span>
+            ${isNested ? `<div class="smell-detail-nested-content">${formattedValue}</div>` : `<span class="smell-detail-value">${formattedValue}</span>`}
+        </div>
+      `;
+    })
+    .join('');
+
+  // Combine all parts
+  const allDetailsHtml = orderedDetailsHtml.join('') + otherMetricsHtml + thresholdsHtml;
+
+  if (indent === 0) {
+    return `
         <div class="smell-details">
             <p class="smell-details-title">Details:</p>
             <div class="smell-details-grid">
-                ${detailItems}
+                ${allDetailsHtml}
             </div>
         </div>
-    `
+    `;
+  } else {
+    return `
+        <div class="smell-details-nested">
+            ${allDetailsHtml}
+        </div>
+    `;
+  }
 }
 
 // Get severity icon
@@ -511,3 +643,4 @@ function getSeverityClass(severity) {
       return ""
   }
 }
+

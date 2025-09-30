@@ -1,0 +1,8 @@
+Requirement already satisfied: pytest in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (7.2.1)
+Requirement already satisfied: attrs>=19.2.0 in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (22.2.0)
+Requirement already satisfied: iniconfig in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (2.0.0)
+Requirement already satisfied: packaging in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (23.0)
+Requirement already satisfied: pluggy<2.0,>=0.12 in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (1.6.0)
+Requirement already satisfied: exceptiongroup>=1.0.0rc8 in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (1.1.0)
+Requirement already satisfied: tomli>=1.0.0 in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (2.0.1)
+Requirement already satisfied: colorama in c:\users\o m e n\appdata\local\programs\python\python310\lib\site-packages (from pytest) (0.4.6)

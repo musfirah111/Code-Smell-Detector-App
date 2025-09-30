@@ -605,23 +605,71 @@ input:checked + .slider:before {
 }
 
 .smell-details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   font-size: 0.75rem;
 }
 
 .smell-detail-item {
   display: flex;
-  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .smell-detail-key {
   color: var(--muted-foreground);
+  white-space: nowrap;
 }
 
 .smell-detail-value {
   font-family: ui-monospace, SFMono-Regular, monospace;
+  word-break: break-all;
+}
+
+.smell-details-nested {
+  margin-top: 0.5rem;
+  border-left: 2px solid var(--border);
+  padding-left: 0.75rem;
+}
+
+.smell-detail-nested-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.smell-thresholds-details {
+  margin-top: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--card);
+}
+
+.smell-thresholds-summary {
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.smell-thresholds-summary::-webkit-details-marker {
+  display: none;
+}
+
+.smell-thresholds-summary:hover {
+  background-color: var(--muted);
+  border-radius: var(--radius);
+}
+
+.smell-thresholds-content {
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 /* No results */
