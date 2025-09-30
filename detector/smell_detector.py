@@ -118,7 +118,7 @@ class LongMethodDetector:
                 complexity += 1
             elif isinstance(child, ast.ExceptHandler):
                 complexity += 1
-            elif isinstance(child, ast.With, ast.AsyncWith):
+            elif isinstance(child, (ast.With, ast.AsyncWith)):
                 complexity += 1
             elif isinstance(child, ast.BoolOp):
                 complexity += len(child.values) - 1

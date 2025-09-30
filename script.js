@@ -1,4 +1,10 @@
-// Application state
+// Application state (in-memory variables held by the browser while the page is open)
+// - currentTab: which tab is visible (upload/config/results)
+// - sourceCode: the contents of the uploaded .py file
+// - fileName: the uploaded file's name
+// - isAnalyzing: whether a request is in progress (disables the button + shows loading)
+// - report: the latest report returned from the backend (normalized for the UI)
+// - config: which detectors are enabled and their thresholds as chosen in the UI
 let currentTab = "upload"
 let sourceCode = ""
 let fileName = ""
@@ -23,14 +29,18 @@ const config = {
   },
 }
 
-// Initialize the application
+// Initialize the application after the HTML is ready
+// - Sets up icons
+// - Wires up all event listeners for tabs, file upload, analyze button, and config inputs
+// - Ensures the Analyze button starts disabled (until a file is loaded)
 document.addEventListener("DOMContentLoaded", () => {
   initializeLucideIcons()
   setupEventListeners()
   updateAnalyzeButton()
 })
 
-// Initialize Lucide icons
+// Initialize Lucide icons (SVG icons library)
+// If the library is available on the window, render icons for any elements with data-lucide
 function initializeLucideIcons() {
   const lucide = window.lucide // Declare the lucide variable
   if (typeof lucide !== "undefined") {
@@ -38,7 +48,11 @@ function initializeLucideIcons() {
   }
 }
 
-// Setup event listeners
+// Setup event listeners for UI interactions
+// - Tab navigation buttons switch the visible content
+// - File input reads the selected Python file into memory
+// - Analyze button triggers the backend request
+// - Switches and number inputs update the in-memory config
 function setupEventListeners() {
   // Tab navigation
   const tabTriggers = document.querySelectorAll(".tab-trigger")
@@ -78,7 +92,9 @@ function setupEventListeners() {
   })
 }
 
-// Switch between tabs
+// Switch between tabs (upload/config/results)
+// - Updates the selected tab button styling
+// - Shows the corresponding tab content and hides the others
 function switchTab(tabName) {
   // Update tab triggers
   const tabTriggers = document.querySelectorAll(".tab-trigger")
@@ -104,6 +120,9 @@ function switchTab(tabName) {
 }
 
 // Handle file upload
+// - Only accepts .py files
+// - Reads the file into memory using FileReader and stores its text in sourceCode
+// - Updates the filename display and enables the Analyze button
 function handleFileUpload(event) {
   const file = event.target.files[0]
   if (file && file.name.endsWith(".py")) {
@@ -118,7 +137,7 @@ function handleFileUpload(event) {
   }
 }
 
-// Update file info display
+// Update file info display (shows or hides the uploaded filename in the UI)
 function updateFileInfo() {
   const fileNameEl = document.getElementById("file-name")
   const fileNameText = document.querySelector(".filename-text")
@@ -132,6 +151,8 @@ function updateFileInfo() {
 }
 
 // Update analyze button state
+// - Disabled when there is no code or while a request is in-flight
+// - Shows "Analyzing..." text while waiting for the backend
 function updateAnalyzeButton() {
   const analyzeBtn = document.getElementById("analyze-btn")
   const hasCode = sourceCode.trim().length > 0
@@ -140,7 +161,8 @@ function updateAnalyzeButton() {
   analyzeBtn.textContent = isAnalyzing ? "Analyzing..." : "Analyze Code"
 }
 
-// Get threshold key from input id
+// Get threshold key from an input element id
+// - Maps DOM ids to the corresponding keys in config.thresholds
 function getThresholdKey(inputId) {
   const mapping = {
     "long-method-sloc": "longMethodSloc",
@@ -152,6 +174,11 @@ function getThresholdKey(inputId) {
 }
 
 // Analyze code
+// 1) Validate that we have code
+// 2) Show the Results tab and a loading state
+// 3) POST the code and current config to the backend API
+// 4) On success, normalize and render the report
+// 5) On failure, show a friendly error in the Results tab
 async function analyzeCode() {
   if (!sourceCode.trim()) return
 
@@ -160,17 +187,101 @@ async function analyzeCode() {
   switchTab("results")
   showLoadingState()
 
-  // Simulate API call delay
-  setTimeout(() => {
-    // Generate mock report for demo
-    report = generateMockReport()
+  try {
+    const apiUrl = "http://localhost:5000/api/analyze" // Flask backend endpoint
+    const payload = {
+      // Python file contents and a filename for the report
+      source_code: sourceCode,
+      file_name: fileName || "uploaded_file.py",
+      config: {
+        // Enabled/disabled detectors (from the UI switches)
+        smells: { ...config.smells },
+        // Thresholds for detectors (from the UI number inputs)
+        thresholds: { ...config.thresholds },
+      },
+    }
+
+    // Send the request to the backend
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    let backendReport = null
+    try {
+      backendReport = await response.json()
+    } catch (_) {
+      backendReport = null
+    }
+
+    if (!response.ok) {
+      const msg = backendReport?.error ? `API error ${response.status}: ${backendReport.error}` : `API error ${response.status}`
+      throw new Error(msg)
+    }
+
+    report = normalizeBackendReport(backendReport) // adapt to UI shape
     displayResults()
+  } catch (err) {
+    console.error("Analysis failed:", err)
     isAnalyzing = false
     updateAnalyzeButton()
-  }, 2000)
+    showAnalysisError(err?.message || "Analysis failed")
+    return
+  }
+
+  isAnalyzing = false
+  updateAnalyzeButton()
 }
 
-// Show loading state
+// Normalize backend report to the shape expected by the UI
+// - The backend nests line numbers under a `location` object; the UI expects flat fields
+// - This function converts and fills sensible defaults to avoid render errors
+function normalizeBackendReport(backendReport) {
+  if (!backendReport || typeof backendReport !== "object") return null
+
+  const normalized = {
+    metadata: backendReport.metadata || {},
+    summary: backendReport.summary || {
+      total_smells_detected: 0,
+      severity_breakdown: { high: 0, medium: 0, low: 0 },
+      smells_by_type: {},
+    },
+    details: [],
+  }
+
+  const details = Array.isArray(backendReport.details) ? backendReport.details : []
+  normalized.details = details.map((d) => ({
+    smell_type: d.smell_type,
+    severity: d.severity,
+    message: d.message,
+    line_start: d.location?.line_start ?? d.line_start ?? 0,
+    line_end: d.location?.line_end ?? d.line_end ?? 0,
+    details: d.details || {},
+  }))
+
+  return normalized
+}
+
+// Show a friendly error message in the Results tab
+// - Hides the loading and results sections
+// - Shows the "no results" card with the error text
+function showAnalysisError(message) {
+  const loading = document.getElementById("loading-state")
+  const resultsContent = document.getElementById("results-content")
+  const noResults = document.getElementById("no-results")
+
+  loading.classList.add("hidden")
+  resultsContent.classList.add("hidden")
+  noResults.classList.remove("hidden")
+
+  const text = noResults.querySelector(".no-results-text p")
+  if (text) {
+    text.textContent = `Error: ${message}. Ensure backend is running at http://localhost:5000 and try again.`
+  }
+}
+
+// Show loading state in the Results tab while waiting for the backend
 function showLoadingState() {
   document.getElementById("loading-state").classList.remove("hidden")
   document.getElementById("results-content").classList.add("hidden")

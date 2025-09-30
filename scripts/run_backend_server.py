@@ -22,8 +22,11 @@ CORS(app)  # Enable CORS for Next.js frontend
 def analyze_code():
     """Analyze Python code for smells."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({'error': 'Invalid JSON body'}), 400
         
+        # Extracts source_code, file_name, frontend_config.
         source_code = data.get('source_code', '')
         file_name = data.get('file_name', 'uploaded_file.py')
         frontend_config = data.get('config', {})
@@ -31,7 +34,7 @@ def analyze_code():
         if not source_code.strip():
             return jsonify({'error': 'No source code provided'}), 400
         
-        # Convert frontend config to backend format
+        # Convert frontend config to backend format.
         config_manager = ConfigManager()
         
         # Update enabled smells
@@ -69,6 +72,12 @@ def analyze_code():
         return jsonify(report)
     
     except Exception as e:
+        # Log full traceback to server console for debugging
+        try:
+            import traceback
+            traceback.print_exc()
+        except Exception:
+            pass
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
 @app.route('/api/config/default', methods=['GET'])
@@ -84,8 +93,9 @@ def health_check():
 
 if __name__ == '__main__':
     print("Starting Code Smell Detector Backend Server...")
-    print("Frontend should be available at: http://localhost:3000")
-    print("Backend API available at: http://localhost:5000")
+    print("Frontend (static) URL: http://localhost:8080/index.html")
+    print("Backend API URL: http://localhost:5000")
+    print("Tip: serve the frontend with 'py -m http.server 8080' from project root")
     print("Use Ctrl+C to stop the server")
     
     app.run(host='0.0.0.0', port=5000, debug=True)
