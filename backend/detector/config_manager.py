@@ -30,11 +30,8 @@ class ConfigManager:
         'large_parameter_list': {
             'params': 6
         },
-        'duplicated_code': {
-            'shingle_size': 30,
-            'similarity': 0.90,
-            'min_chunk_tokens': 80
-        },
+        # Note: duplicated_code thresholds are derived at runtime by the detector;
+        # no static thresholds are kept in config to avoid UI confusion.
         'magic_numbers': {
             'min_occurrences': 3,
             'whitelist': [0, 1, -1]

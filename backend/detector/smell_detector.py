@@ -135,9 +135,9 @@ class GodClassDetector:
     
     def __init__(self, config: Dict[str, Any]):
         # Threshold defaults from literature; allow override via config
-        self.atfd_few = config.get('atfd_few', 5)              # Few ∈ [2..5]; choose upper bound 5 by default
-        self.wmc_very_high = config.get('wmc_very_high', 47)    # Very High (per metrics-in-practice)
-        self.tcc_one_third = config.get('tcc_one_third', 0.33)  # One Third
+        self.atfd_few = config.get('atfd_few', 2)              # Few ∈ [2..5]; choose upper bound 5 by default
+        self.wmc_very_high = config.get('wmc_very_high', 10)    # Very High (per metrics-in-practice)
+        self.tcc_one_third = config.get('tcc_one_third', 0.6) # One Third
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -242,38 +242,52 @@ class DuplicatedCodeDetector:
     
     def __init__(self, config: Dict[str, Any]):
         # Only the essential knob used for both clone types
-        self.min_block_lines = config.get('min_block_lines', 5)
+        self.min_block_lines = config.get('min_block_lines', 3)
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
         lines = source_code.split('\n')
         
-        # Extract code blocks (methods and classes)
+        # Extract code blocks (functions/classes and significant inner blocks)
         code_blocks = []
-        
+
+        def add_block(name: str, node: ast.AST):
+            start_line = getattr(node, 'lineno', None)
+            end_line = getattr(node, 'end_lineno', start_line)
+            if start_line is None:
+                return
+            block_lines = []
+            for i in range(start_line - 1, min(end_line, len(lines))):
+                line = lines[i].strip()
+                if line and not line.startswith('#'):
+                    block_lines.append(line)
+            if len(block_lines) < self.min_block_lines:
+                return
+            joined = '\n'.join(block_lines)
+            code_blocks.append({
+                'name': name,
+                'type': type(node).__name__,
+                'start_line': start_line,
+                'end_line': end_line,
+                'lines': block_lines,
+                'exact_sig': self._normalize_exact(joined),
+                'renamed_sig': self._normalize_with_placeholders(joined),
+            })
+
+        def walk_function(func: ast.AST):
+            # Whole function as a block
+            add_block(getattr(func, 'name', 'function'), func)
+            # Significant inner blocks commonly duplicated
+            for inner in ast.walk(func):
+                if isinstance(inner, (ast.For, ast.While, ast.If)):
+                    name = f"{getattr(func, 'name', 'function')}:{type(inner).__name__}@{inner.lineno}"
+                    add_block(name, inner)
+
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                start_line = node.lineno
-                end_line = node.end_lineno or start_line
-                
-                block_lines = []
-                for i in range(start_line - 1, min(end_line, len(lines))):
-                    line = lines[i].strip()
-                    if line and not line.startswith('#'):
-                        block_lines.append(line)
-                
-                if len(block_lines) >= self.min_block_lines:
-                    joined = '\n'.join(block_lines)
-                    code_blocks.append({
-                        'name': getattr(node, 'name', type(node).__name__),
-                        'type': type(node).__name__,
-                        'start_line': start_line,
-                        'end_line': end_line,
-                        'lines': block_lines,
-                        'tokens': self._tokenize_code(' '.join(block_lines)),
-                        'exact_sig': self._normalize_exact(joined),
-                        'renamed_sig': self._normalize_with_placeholders(joined),
-                    })
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                walk_function(node)
+            elif isinstance(node, ast.ClassDef):
+                add_block(node.name, node)
         
         # 1) Exact duplicates (ignoring whitespace/comments)
         seen_exact: Dict[str, List[int]] = {}
@@ -294,20 +308,16 @@ class DuplicatedCodeDetector:
                             line_start=min(b1['start_line'], b2['start_line']),
                             line_end=max(b1['end_line'], b2['end_line']),
                             severity="medium",
-                            message=f"Duplicated code detected between '{b1['name']}' and '{b2['name']}'",
+                            message=f"Duplicated code detected between '{self._clean_name(b1['name'])}' and '{self._clean_name(b2['name'])}'",
                             details={
-                                'block1': {
-                                    'name': b1['name'],
-                                    'type': b1['type'],
-                                    'start_line': b1['start_line'],
-                                    'end_line': b1['end_line']
-                                },
-                                'block2': {
-                                    'name': b2['name'],
-                                    'type': b2['type'],
-                                    'start_line': b2['start_line'],
-                                    'end_line': b2['end_line']
-                                }
+                                'block1_name': self._clean_name(b1['name']),
+                                'block1_type': b1['type'],
+                                'block1_start_line': b1['start_line'],
+                                'block1_end_line': b1['end_line'],
+                                'block2_name': self._clean_name(b2['name']),
+                                'block2_type': b2['type'],
+                                'block2_start_line': b2['start_line'],
+                                'block2_end_line': b2['end_line']
                             }
                         ))
         
@@ -332,20 +342,16 @@ class DuplicatedCodeDetector:
                             line_start=min(b1['start_line'], b2['start_line']),
                             line_end=max(b1['end_line'], b2['end_line']),
                             severity="low",
-                            message=f"Duplicated structure detected between '{b1['name']}' and '{b2['name']}'",
+                            message=f"Duplicated structure detected between '{self._clean_name(b1['name'])}' and '{self._clean_name(b2['name'])}'",
                             details={
-                                'block1': {
-                                    'name': b1['name'],
-                                    'type': b1['type'],
-                                    'start_line': b1['start_line'],
-                                    'end_line': b1['end_line']
-                                },
-                                'block2': {
-                                    'name': b2['name'],
-                                    'type': b2['type'],
-                                    'start_line': b2['start_line'],
-                                    'end_line': b2['end_line']
-                                }
+                                'block1_name': self._clean_name(b1['name']),
+                                'block1_type': b1['type'],
+                                'block1_start_line': b1['start_line'],
+                                'block1_end_line': b1['end_line'],
+                                'block2_name': self._clean_name(b2['name']),
+                                'block2_type': b2['type'],
+                                'block2_start_line': b2['start_line'],
+                                'block2_end_line': b2['end_line']
                             }
                         ))
         
@@ -391,6 +397,22 @@ class DuplicatedCodeDetector:
         # Normalize whitespace
         code = re.sub(r'\s+', ' ', code).strip()
         return code
+
+    def _clean_name(self, name: str) -> str:
+        """Clean generated block labels like 'func:For@102' to just 'func'."""
+        try:
+            if not isinstance(name, str):
+                return str(name)
+            # Strip trailing '@<line>' if present
+            at_index = name.rfind('@')
+            if at_index != -1 and name[at_index + 1:].isdigit():
+                name = name[:at_index]
+            # Strip ':<AstType>' if present
+            if ':' in name:
+                name = name.split(':', 1)[0]
+            return name
+        except Exception:
+            return str(name)
     
     def _calculate_similarity(self, tokens1: List[str], tokens2: List[str]) -> float:
         """Calculate similarity between two token lists using Jaccard similarity."""

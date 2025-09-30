@@ -470,6 +470,87 @@ function createSmellItem(smell, index) {
 function createSmellDetails(details, indent = 0, currentSmellType = null) {
   const indentStyle = `padding-left: ${indent * 1.5}rem;`;
 
+  // Special formatting for DuplicatedCode: show Name, Start Line, End Line, Type first for each block
+  if (
+    currentSmellType === "DuplicatedCode" &&
+    details &&
+    (details.block1_name || details.block2_name)
+  ) {
+    const blockSection = (label, name, start, end, type) => `
+      <div class="smell-detail-item" style="${indentStyle}">
+        <span class="smell-detail-key">${label}:</span>
+        <div class="smell-detail-nested-content">
+          <div class="smell-detail-item" style="${indentStyle}">
+            <span class="smell-detail-key">Name:</span>
+            <span class="smell-detail-value">${String(name ?? "-")}</span>
+          </div>
+          <div class="smell-detail-item" style="${indentStyle}">
+            <span class="smell-detail-key">Start Line:</span>
+            <span class="smell-detail-value">${String(start ?? "-")}</span>
+          </div>
+          <div class="smell-detail-item" style="${indentStyle}">
+            <span class="smell-detail-key">End Line:</span>
+            <span class="smell-detail-value">${String(end ?? "-")}</span>
+          </div>
+          <div class="smell-detail-item" style="${indentStyle}">
+            <span class="smell-detail-key">Type:</span>
+            <span class="smell-detail-value">${String(type ?? "-")}</span>
+          </div>
+        </div>
+      </div>`;
+
+    const blocksHtml = [
+      blockSection(
+        "Block 1",
+        details.block1_name,
+        details.block1_start_line,
+        details.block1_end_line,
+        details.block1_type
+      ),
+      blockSection(
+        "Block 2",
+        details.block2_name,
+        details.block2_start_line,
+        details.block2_end_line,
+        details.block2_type
+      ),
+    ].join("");
+
+    // Remove the fields we've already shown, then render any remaining metrics below
+    const remaining = { ...details };
+    [
+      "block1_name",
+      "block1_start_line",
+      "block1_end_line",
+      "block1_type",
+      "block2_name",
+      "block2_start_line",
+      "block2_end_line",
+      "block2_type",
+    ].forEach((k) => delete remaining[k]);
+
+    const restHtml = Object.keys(remaining).length
+      ? createSmellDetails(remaining, indent + 1)
+      : "";
+
+    if (indent === 0) {
+      return `
+        <div class="smell-details">
+          <p class="smell-details-title">Details:</p>
+          <div class="smell-details-grid">
+            ${blocksHtml}
+            ${restHtml}
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div class="smell-details-nested">
+          ${blocksHtml}
+          ${restHtml}
+        </div>`;
+    }
+  }
+
   let orderedDetailsHtml = [];
   let thresholdsHtml = '';
   const otherDetails = { ...details };
