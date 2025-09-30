@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Smell Detector</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">
+                        <i data-lucide="file-text"></i>
+                    </div>
+                    <div class="header-text">
+                        <h1>Code Smell Detector</h1>
+                        <p>Analyze Python code for quality issues</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container main-content">
+         Tab Navigation 
+        <div class="tabs">
+            <div class="tab-list">
+                <button class="tab-trigger active" data-tab="upload">
+                    <i data-lucide="upload"></i>
+                    Upload Code
+                </button>
+                <button class="tab-trigger" data-tab="config">
+                    <i data-lucide="settings"></i>
+                    Configuration
+                </button>
+                <button class="tab-trigger" data-tab="results">
+                    <i data-lucide="file-text"></i>
+                    Results
+                </button>
+            </div>
+
+             Upload Tab 
+            <div class="tab-content active" id="upload-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Upload Python File</h2>
+                        <p>Select a Python file to analyze for code smells.</p>
+                    </div>
+                    <div class="card-content">
+                        <div class="form-group">
+                            <label for="file-upload">Choose Python File</label>
+                            <input type="file" id="file-upload" accept=".py" class="file-input">
+                        </div>
+
+                        <div class="upload-footer">
+                            <div class="file-info">
+                                <span id="file-name" class="file-name hidden">
+                                    <i data-lucide="file-text"></i>
+                                    <span class="filename-text"></span>
+                                </span>
+                            </div>
+                            <button id="analyze-btn" class="btn btn-primary" disabled>
+                                Analyze Code
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             Configuration Tab 
+            <div class="tab-content" id="config-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Detection Configuration</h2>
+                        <p>Configure which code smells to detect and their thresholds.</p>
+                    </div>
+                    <div class="card-content">
+                        <div class="config-section">
+                            <h3>Enabled Detectors</h3>
+                            <div class="detector-grid">
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>Long Method</label>
+                                        <p>Detect methods that are too long</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="LongMethod" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>God Class</label>
+                                        <p>Detect classes with too many responsibilities</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="GodClass" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>Duplicated Code</label>
+                                        <p>Find duplicated code blocks</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="DuplicatedCode" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>Large Parameter List</label>
+                                        <p>Methods with too many parameters</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="LargeParameterList" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>Magic Numbers</label>
+                                        <p>Hard-coded numeric values</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="MagicNumbers" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="detector-item">
+                                    <div class="detector-info">
+                                        <label>Feature Envy</label>
+                                        <p>Methods using other classes' data</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="FeatureEnvy" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="separator-line"></div>
+
+                        <div class="config-section">
+                            <h3>Thresholds</h3>
+                            <div class="threshold-grid">
+                                <div class="form-group">
+                                    <label for="long-method-sloc">Long Method SLOC</label>
+                                    <input type="number" id="long-method-sloc" value="30" class="number-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="god-class-methods">God Class Max Methods</label>
+                                    <input type="number" id="god-class-methods" value="20" class="number-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="large-param-list">Large Parameter List</label>
+                                    <input type="number" id="large-param-list" value="6" class="number-input">
+                                </div>
+                                <div class="form-group">
+                                    <label for="magic-numbers">Magic Number Min Occurrences</label>
+                                    <input type="number" id="magic-numbers" value="3" class="number-input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+             Results Tab 
+            <div class="tab-content" id="results-tab">
+                <div id="loading-state" class="card hidden">
+                    <div class="card-content loading-content">
+                        <div class="loading-spinner"></div>
+                        <p>Analyzing code for smells...</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="results-content" class="hidden">
+                     Summary Cards 
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-content">
+                                <div class="summary-text">
+                                    <p class="summary-label">Total Smells</p>
+                                    <p class="summary-value" id="total-smells">0</p>
+                                </div>
+                                <i data-lucide="file-text" class="summary-icon"></i>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-content">
+                                <div class="summary-text">
+                                    <p class="summary-label">High Severity</p>
+                                    <p class="summary-value high-severity" id="high-severity">0</p>
+                                </div>
+                                <i data-lucide="x-circle" class="summary-icon high-severity"></i>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-content">
+                                <div class="summary-text">
+                                    <p class="summary-label">Medium Severity</p>
+                                    <p class="summary-value medium-severity" id="medium-severity">0</p>
+                                </div>
+                                <i data-lucide="alert-triangle" class="summary-icon medium-severity"></i>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-content">
+                                <div class="summary-text">
+                                    <p class="summary-label">Low Severity</p>
+                                    <p class="summary-value low-severity" id="low-severity">0</p>
+                                </div>
+                                <i data-lucide="check-circle" class="summary-icon low-severity"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                     Detailed Results 
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Detected Code Smells</h2>
+                            <p id="results-description">Detailed analysis results</p>
+                        </div>
+                        <div class="card-content">
+                            <div id="smell-details" class="smell-list">
+                                 Smell details will be populated here 
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="no-results" class="card">
+                    <div class="card-content no-results-content">
+                        <i data-lucide="file-text" class="no-results-icon"></i>
+                        <div class="no-results-text">
+                            <h3>No Analysis Results</h3>
+                            <p>Upload and analyze a Python file to see results here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

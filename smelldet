@@ -1,0 +1,9 @@
+#!/bin/bash
+# Shell script wrapper for the Code Smell Detector
+# This allows running the tool as 'smelldet' from anywhere
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Run the Python CLI
+python3 "$SCRIPT_DIR/smelldet.py" "$@"

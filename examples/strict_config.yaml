@@ -1,0 +1,41 @@
+# Strict Configuration - Lower thresholds for higher code quality
+language: "python"
+
+smells:
+  LongMethod: true
+  GodClass: true
+  DuplicatedCode: true
+  LargeParameterList: true
+  MagicNumbers: true
+  FeatureEnvy: true
+
+long_method:
+  sloc: 20          # Stricter: 20 lines instead of 30
+  cyclomatic: 8     # Stricter: 8 complexity instead of 12
+
+god_class:
+  max_methods: 15   # Stricter: 15 methods instead of 20
+  max_fields: 10    # Stricter: 10 fields instead of 15
+  max_coupling: 10  # Stricter: 10 coupling instead of 15
+
+large_parameter_list:
+  params: 4         # Stricter: 4 params instead of 6
+
+duplicated_code:
+  shingle_size: 25
+  similarity: 0.85  # Stricter: 85% similarity instead of 90%
+  min_chunk_tokens: 60
+
+magic_numbers:
+  min_occurrences: 2  # Stricter: 2 occurrences instead of 3
+  whitelist: [0, 1, -1, 2, 10, 100]  # Extended whitelist
+
+feature_envy:
+  min_sloc: 8
+  foreign_access_ratio: 1.2  # Stricter: 1.2 ratio instead of 1.5
+  min_foreign_accesses: 2    # Stricter: 2 accesses instead of 3
+
+report:
+  format: "table"
+  include_metrics: true
+  show_active_smells: true

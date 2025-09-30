@@ -1,0 +1,69 @@
+# Code Smell Detector Configuration
+# This file controls which smells are detected and their thresholds
+
+# Language setting (currently only Python is supported)
+language: "python"
+
+# Which smells are enabled by default (can be overridden by CLI)
+smells:
+  LongMethod: true
+  GodClass: true
+  DuplicatedCode: true
+  LargeParameterList: true
+  MagicNumbers: true
+  FeatureEnvy: true
+
+# Long Method Detection Settings
+long_method:
+  # Source Lines of Code threshold
+  sloc: 30
+  # Cyclomatic complexity threshold
+  cyclomatic: 12
+
+# God Class (Blob) Detection Settings
+god_class:
+  # Maximum number of methods in a class
+  max_methods: 20
+  # Maximum number of fields/attributes in a class
+  max_fields: 15
+  # Maximum coupling (external dependencies)
+  max_coupling: 15
+
+# Large Parameter List Detection Settings
+large_parameter_list:
+  # Maximum number of parameters (excluding self)
+  params: 6
+
+# Duplicated Code Detection Settings
+duplicated_code:
+  # Shingle size for text comparison
+  shingle_size: 30
+  # Similarity threshold (0.0 to 1.0)
+  similarity: 0.90
+  # Minimum chunk size in tokens
+  min_chunk_tokens: 80
+
+# Magic Numbers Detection Settings
+magic_numbers:
+  # Minimum occurrences to be considered magic
+  min_occurrences: 3
+  # Numbers to ignore (common values)
+  whitelist: [0, 1, -1]
+
+# Feature Envy Detection Settings
+feature_envy:
+  # Minimum method size to analyze
+  min_sloc: 10
+  # Ratio of foreign to self accesses
+  foreign_access_ratio: 1.5
+  # Minimum foreign accesses to trigger
+  min_foreign_accesses: 3
+
+# Report Generation Settings
+report:
+  # Output format: json | table
+  format: "json"
+  # Include detailed metrics in report
+  include_metrics: true
+  # Show which smells were actively checked
+  show_active_smells: true
