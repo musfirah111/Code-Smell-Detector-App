@@ -241,9 +241,8 @@ class DuplicatedCodeDetector:
     """Detects duplicated code blocks."""
     
     def __init__(self, config: Dict[str, Any]):
-        self.shingle_size = config.get('shingle_size', 30)
-        self.similarity_threshold = config.get('similarity', 0.90)
-        self.min_chunk_tokens = config.get('min_chunk_tokens', 80)
+        # Only the essential knob used for both clone types
+        self.min_block_lines = config.get('min_block_lines', 5)
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -263,45 +262,92 @@ class DuplicatedCodeDetector:
                     if line and not line.startswith('#'):
                         block_lines.append(line)
                 
-                if len(block_lines) >= 5:  # Only consider blocks with at least 5 lines
+                if len(block_lines) >= self.min_block_lines:
+                    joined = '\n'.join(block_lines)
                     code_blocks.append({
-                        'name': node.name,
+                        'name': getattr(node, 'name', type(node).__name__),
                         'type': type(node).__name__,
                         'start_line': start_line,
                         'end_line': end_line,
                         'lines': block_lines,
-                        'tokens': self._tokenize_code(' '.join(block_lines))
+                        'tokens': self._tokenize_code(' '.join(block_lines)),
+                        'exact_sig': self._normalize_exact(joined),
+                        'renamed_sig': self._normalize_with_placeholders(joined),
                     })
         
-        # Compare blocks for similarity
-        for i, block1 in enumerate(code_blocks):
-            for j, block2 in enumerate(code_blocks[i+1:], i+1):
-                similarity = self._calculate_similarity(block1['tokens'], block2['tokens'])
-                
-                if similarity >= self.similarity_threshold:
-                    results.append(SmellResult(
-                        smell_type="DuplicatedCode",
-                        file_path=file_path,
-                        line_start=min(block1['start_line'], block2['start_line']),
-                        line_end=max(block1['end_line'], block2['end_line']),
-                        severity="medium",
-                        message=f"Duplicated code detected between '{block1['name']}' and '{block2['name']}' (similarity: {similarity:.2%})",
-                        details={
-                            'block1': {
-                                'name': block1['name'],
-                                'type': block1['type'],
-                                'start_line': block1['start_line'],
-                                'end_line': block1['end_line']
-                            },
-                            'block2': {
-                                'name': block2['name'],
-                                'type': block2['type'],
-                                'start_line': block2['start_line'],
-                                'end_line': block2['end_line']
-                            },
-                            'similarity': similarity
-                        }
-                    ))
+        # 1) Exact duplicates (ignoring whitespace/comments)
+        seen_exact: Dict[str, List[int]] = {}
+        for idx, blk in enumerate(code_blocks):
+            seen_exact.setdefault(blk['exact_sig'], []).append(idx)
+        for indices in seen_exact.values():
+            if len(indices) > 1:
+                # Pairwise report but avoid duplicates by only (i<j)
+                for a in range(len(indices)):
+                    for b in range(a + 1, len(indices)):
+                        i = indices[a]
+                        j = indices[b]
+                        b1 = code_blocks[i]
+                        b2 = code_blocks[j]
+                        results.append(SmellResult(
+                            smell_type="DuplicatedCode",
+                            file_path=file_path,
+                            line_start=min(b1['start_line'], b2['start_line']),
+                            line_end=max(b1['end_line'], b2['end_line']),
+                            severity="medium",
+                            message=f"Duplicated code detected between '{b1['name']}' and '{b2['name']}'",
+                            details={
+                                'block1': {
+                                    'name': b1['name'],
+                                    'type': b1['type'],
+                                    'start_line': b1['start_line'],
+                                    'end_line': b1['end_line']
+                                },
+                                'block2': {
+                                    'name': b2['name'],
+                                    'type': b2['type'],
+                                    'start_line': b2['start_line'],
+                                    'end_line': b2['end_line']
+                                }
+                            }
+                        ))
+        
+        # 2) Syntactically identical except for identifiers/literals/types
+        seen_renamed: Dict[str, List[int]] = {}
+        for idx, blk in enumerate(code_blocks):
+            seen_renamed.setdefault(blk['renamed_sig'], []).append(idx)
+        for indices in seen_renamed.values():
+            if len(indices) > 1:
+                for a in range(len(indices)):
+                    for b in range(a + 1, len(indices)):
+                        i = indices[a]
+                        j = indices[b]
+                        b1 = code_blocks[i]
+                        b2 = code_blocks[j]
+                        # Skip ones already reported as exact duplicates
+                        if b1['exact_sig'] == b2['exact_sig']:
+                            continue
+                        results.append(SmellResult(
+                            smell_type="DuplicatedCode",
+                            file_path=file_path,
+                            line_start=min(b1['start_line'], b2['start_line']),
+                            line_end=max(b1['end_line'], b2['end_line']),
+                            severity="low",
+                            message=f"Duplicated structure detected between '{b1['name']}' and '{b2['name']}'",
+                            details={
+                                'block1': {
+                                    'name': b1['name'],
+                                    'type': b1['type'],
+                                    'start_line': b1['start_line'],
+                                    'end_line': b1['end_line']
+                                },
+                                'block2': {
+                                    'name': b2['name'],
+                                    'type': b2['type'],
+                                    'start_line': b2['start_line'],
+                                    'end_line': b2['end_line']
+                                }
+                            }
+                        ))
         
         return results
     
@@ -314,6 +360,37 @@ class DuplicatedCodeDetector:
         # Split into tokens
         tokens = re.findall(r'\w+|[^\w\s]', code)
         return [token.lower() for token in tokens if token.strip()]
+
+    def _normalize_exact(self, code: str) -> str:
+        """Produce a canonical form ignoring comments and whitespace-only differences."""
+        # Strip line comments
+        code = re.sub(r'(?m)#.*$', '', code)
+        # Collapse all whitespace to single spaces
+        code = re.sub(r'\s+', ' ', code).strip()
+        return code
+
+    def _normalize_with_placeholders(self, code: str) -> str:
+        """Produce a canonical form replacing identifiers and literals with placeholders.
+        Keeps Python keywords intact so structure is preserved.
+        """
+        # Remove comments
+        code = re.sub(r'(?m)#.*$', '', code)
+        # Strings -> STR (simple heuristic, not a full parser)
+        code = re.sub(r'(?:r|rb|rf|f|fr|b)?([\'\"])(?:\\.|(?!\1).)*\1', 'STR', code)
+        # Numbers -> NUM
+        code = re.sub(r'\b\d+(?:\.\d+)?\b', 'NUM', code)
+        # Identifiers -> ID, but keep keywords
+        keywords = {
+            'def','class','return','if','elif','else','for','while','try','except','with','as','pass','break','continue',
+            'and','or','not','in','is','from','import','lambda','yield','async','await','True','False','None'
+        }
+        def replace_identifier(match):
+            word = match.group(0)
+            return word if word in keywords else 'ID'
+        code = re.sub(r'\b[A-Za-z_][A-Za-z0-9_]*\b', replace_identifier, code)
+        # Normalize whitespace
+        code = re.sub(r'\s+', ' ', code).strip()
+        return code
     
     def _calculate_similarity(self, tokens1: List[str], tokens2: List[str]) -> float:
         """Calculate similarity between two token lists using Jaccard similarity."""
