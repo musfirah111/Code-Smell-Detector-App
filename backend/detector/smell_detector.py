@@ -65,8 +65,8 @@ class LongMethodDetector:
     """Detects methods that are too long."""
     
     def __init__(self, config: Dict[str, Any]):
-        self.sloc_threshold = config.get('sloc', 30)
-        self.cyclomatic_threshold = config.get('cyclomatic', 12)
+        self.sloc_threshold = config.get('sloc')
+        self.cyclomatic_threshold = config.get('cyclomatic')
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -134,10 +134,10 @@ class GodClassDetector:
     """
     
     def __init__(self, config: Dict[str, Any]):
-        # Threshold defaults from literature; allow override via config
-        self.atfd_few = config.get('atfd_few', 2)              # Few ∈ [2..5]; choose upper bound 5 by default
-        self.wmc_very_high = config.get('wmc_very_high', 10)    # Very High (per metrics-in-practice)
-        self.tcc_one_third = config.get('tcc_one_third', 0.6) # One Third
+        # Thresholds from config (no hardcoded defaults)
+        self.atfd_few = config.get('atfd_few')
+        self.wmc_very_high = config.get('wmc_very_high')
+        self.tcc_one_third = config.get('tcc_one_third')
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -242,7 +242,7 @@ class DuplicatedCodeDetector:
     
     def __init__(self, config: Dict[str, Any]):
         # Only the essential knob used for both clone types
-        self.min_block_lines = config.get('min_block_lines', 3)
+        self.min_block_lines = config.get('min_block_lines')
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -431,7 +431,7 @@ class LargeParameterListDetector:
     """Detects methods with too many parameters."""
     
     def __init__(self, config: Dict[str, Any]):
-        self.max_params = config.get('params', 6)
+        self.max_params = config.get('params')
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -479,8 +479,8 @@ class MagicNumbersDetector:
     """Detects magic numbers in code."""
     
     def __init__(self, config: Dict[str, Any]):
-        self.min_occurrences = config.get('min_occurrences', 3)
-        self.whitelist = set(config.get('whitelist', [0, 1, -1]))
+        self.min_occurrences = config.get('min_occurrences')
+        self.whitelist = set(config.get('whitelist', []))
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []
@@ -527,11 +527,11 @@ class FeatureEnvyDetector:
     
     def __init__(self, config: Dict[str, Any]):
         # Minimum method size in lines (non-empty, non-comment) to consider
-        self.min_sloc = config.get('min_sloc', 10)
-        # Thresholds for the three metrics (defaults from literature)
-        self.atfd_threshold = config.get('atfd_threshold', 5)
-        self.laa_threshold = config.get('laa_threshold', 0.33)
-        self.fdp_threshold = config.get('fdp_threshold', 2)
+        self.min_sloc = config.get('min_sloc')
+        # Thresholds for the three metrics
+        self.atfd_threshold = config.get('atfd_threshold')
+        self.laa_threshold = config.get('laa_threshold')
+        self.fdp_threshold = config.get('fdp_threshold')
     
     def detect(self, file_path: str, source_code: str, tree: ast.AST) -> List[SmellResult]:
         results = []

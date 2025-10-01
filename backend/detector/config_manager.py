@@ -25,13 +25,17 @@ class ConfigManager:
         'god_class': {
             'max_methods': 20,
             'max_fields': 15,
-            'max_coupling': 15
+            'max_coupling': 15,
+            'atfd_few': 2,
+            'wmc_very_high': 10,
+            'tcc_one_third': 0.6
         },
         'large_parameter_list': {
             'params': 6
         },
-        # Note: duplicated_code thresholds are derived at runtime by the detector;
-        # no static thresholds are kept in config to avoid UI confusion.
+        'duplicated_code': {
+            'min_block_lines': 3
+        },
         'magic_numbers': {
             'min_occurrences': 3,
             'whitelist': [0, 1, -1]
@@ -39,7 +43,10 @@ class ConfigManager:
         'feature_envy': {
             'min_sloc': 10,
             'foreign_access_ratio': 1.5,
-            'min_foreign_accesses': 3
+            'min_foreign_accesses': 3,
+            'atfd_threshold': 5,
+            'laa_threshold': 0.33,
+            'fdp_threshold': 2
         },
         'report': {
             'format': 'json',

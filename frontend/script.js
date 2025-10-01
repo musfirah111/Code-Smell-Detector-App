@@ -10,7 +10,7 @@ let sourceCode = ""
 let fileName = ""
 let isAnalyzing = false
 let report = null
-const config = {
+let config = {
   smells: {
     LongMethod: true,
     GodClass: true,
@@ -52,11 +52,59 @@ const formatThresholdKey = (key) => {
 // - Sets up icons
 // - Wires up all event listeners for tabs, file upload, analyze button, and config inputs
 // - Ensures the Analyze button starts disabled (until a file is loaded)
+// - Loads default configuration from backend
 document.addEventListener("DOMContentLoaded", () => {
   initializeLucideIcons()
   setupEventListeners()
   updateAnalyzeButton()
+  loadDefaultConfig()
 })
+
+// Load default configuration from backend
+// This ensures the frontend uses the same defaults as the backend
+async function loadDefaultConfig() {
+  try {
+    const response = await fetch("http://localhost:5000/api/config/default")
+    if (response.ok) {
+      const backendConfig = await response.json()
+      
+      // Update config with backend defaults
+      config.smells = backendConfig.smells || config.smells
+      config.thresholds = {
+        longMethodSloc: backendConfig.long_method?.sloc || 30,
+        longMethodCyclomatic: backendConfig.long_method?.cyclomatic || 12,
+        godClassMethods: backendConfig.god_class?.max_methods || 20,
+        godClassFields: backendConfig.god_class?.max_fields || 15,
+        largeParameterList: backendConfig.large_parameter_list?.params || 6,
+        magicNumberOccurrences: backendConfig.magic_numbers?.min_occurrences || 3,
+      }
+      
+      // Update UI with new defaults
+      updateConfigUI()
+    }
+  } catch (error) {
+    console.warn("Could not load default config from backend, using fallback defaults:", error)
+  }
+}
+
+// Update UI elements with current config values
+function updateConfigUI() {
+  // Update smell switches
+  Object.keys(config.smells).forEach(smellType => {
+    const switchEl = document.getElementById(smellType)
+    if (switchEl) {
+      switchEl.checked = config.smells[smellType]
+    }
+  })
+  
+  // Update threshold inputs
+  Object.keys(config.thresholds).forEach(thresholdKey => {
+    const inputEl = document.getElementById(thresholdKey.replace(/([A-Z])/g, '-$1').toLowerCase())
+    if (inputEl) {
+      inputEl.value = config.thresholds[thresholdKey]
+    }
+  })
+}
 
 // Initialize Lucide icons (SVG icons library)
 // If the library is available on the window, render icons for any elements with data-lucide
@@ -307,99 +355,6 @@ function showLoadingState() {
   document.getElementById("no-results").classList.add("hidden")
 }
 
-// Generate mock report
-function generateMockReport() {
-  return {
-    metadata: {
-      file_path: fileName || "uploaded_file.py",
-      scan_timestamp: new Date().toISOString(),
-      active_smells: Object.keys(config.smells).filter((smell) => config.smells[smell]),
-    },
-    summary: {
-      total_smells_detected: 8,
-      severity_breakdown: {
-        high: 2,
-        medium: 5,
-        low: 1,
-      },
-      smells_by_type: {
-        LongMethod: 2,
-        GodClass: 1,
-        DuplicatedCode: 2,
-        LargeParameterList: 1,
-        MagicNumbers: 1,
-        FeatureEnvy: 1,
-      },
-    },
-    details: [
-      {
-        smell_type: "LongMethod",
-        severity: "high",
-        message: "Method 'process_customer_order_with_complex_calculations' is too long (SLOC: 135, Complexity: 18)",
-        line_start: 45,
-        line_end: 180,
-        details: {
-          method_name: "process_customer_order_with_complex_calculations",
-          sloc: 135,
-          cyclomatic_complexity: 18,
-        },
-      },
-      {
-        smell_type: "GodClass",
-        severity: "high",
-        message: "Class 'BookstoreManager' has too many responsibilities (Methods: 25, Fields: 18, Coupling: 12)",
-        line_start: 10,
-        line_end: 280,
-        details: {
-          class_name: "BookstoreManager",
-          method_count: 25,
-          field_count: 18,
-          coupling: 12,
-        },
-      },
-      {
-        smell_type: "DuplicatedCode",
-        severity: "medium",
-        message:
-          "Duplicated code detected between 'validate_book_availability' and 'process_customer_order' (similarity: 85%)",
-        line_start: 60,
-        line_end: 194,
-        details: { similarity: 0.85 },
-      },
-      {
-        smell_type: "LargeParameterList",
-        severity: "medium",
-        message: "Method 'add_book_to_inventory' has too many parameters (8)",
-        line_start: 25,
-        line_end: 25,
-        details: {
-          method_name: "add_book_to_inventory",
-          parameter_count: 8,
-        },
-      },
-      {
-        smell_type: "MagicNumbers",
-        severity: "medium",
-        message: "Magic number 0.9 appears 5 times",
-        line_start: 85,
-        line_end: 240,
-        details: { number: 0.9, occurrences: 5 },
-      },
-      {
-        smell_type: "FeatureEnvy",
-        severity: "medium",
-        message: "Method 'verify_large_transaction' shows feature envy (foreign: 12, self: 3)",
-        line_start: 212,
-        line_end: 250,
-        details: {
-          method_name: "verify_large_transaction",
-          foreign_accesses: 12,
-          self_accesses: 3,
-        },
-      },
-    ],
-  }
-}
 
 // Display results
 function displayResults() {
