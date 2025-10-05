@@ -8,8 +8,11 @@ from flask_cors import CORS
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import our modules
-sys.path.append(str(Path(__file__).parent.parent))
+# Ensure project root is on sys.path so 'backend' package can be imported
+current_file_path = Path(__file__).resolve()
+project_root_path = current_file_path.parents[2]
+if str(project_root_path) not in sys.path:
+    sys.path.insert(0, str(project_root_path))
 
 from backend.detector.smell_detector import CodeSmellDetector
 from backend.detector.config_manager import ConfigManager
