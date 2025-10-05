@@ -5,7 +5,7 @@ Report generation for code smell detection results.
 import json
 from typing import List, Dict, Any, Set
 from datetime import datetime
-from detector.smell_detector import SmellResult
+from backend.detector.smell_detector import SmellResult
 
 class ReportGenerator:
     """Generates reports from code smell detection results."""

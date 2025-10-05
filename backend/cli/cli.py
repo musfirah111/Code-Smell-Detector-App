@@ -9,9 +9,9 @@ import json
 from pathlib import Path
 from typing import Set, Optional, List
 
-from detector.smell_detector import CodeSmellDetector
-from detector.config_manager import ConfigManager
-from detector.report_generator import ReportGenerator
+from backend.detector.smell_detector import CodeSmellDetector
+from backend.detector.config_manager import ConfigManager
+from backend.detector.report_generator import ReportGenerator
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""

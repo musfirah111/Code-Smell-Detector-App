@@ -6,7 +6,7 @@ import unittest
 import tempfile
 import os
 from pathlib import Path
-from detector.config_manager import ConfigManager
+from backend.detector.config_manager import ConfigManager
 
 class TestConfigManager(unittest.TestCase):
     """Test the ConfigManager class."""
@@ -95,8 +95,8 @@ long_method:
         self.assertIn('cyclomatic', long_method_config)
         
         god_class_config = config_manager.get_smell_config('GodClass')
-        self.assertIn('max_methods', god_class_config)
-        self.assertIn('max_fields', god_class_config)
+        self.assertIn('atfd_few', god_class_config)
+        self.assertIn('wmc_very_high', god_class_config)
     
     def test_save_config(self):
         """Test saving configuration to file."""
