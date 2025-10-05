@@ -13,7 +13,7 @@ This document identifies the six intentional code smells in `smelly_program.py` 
 **Justification:** This class handles too many responsibilities including inventory management, customer management, order processing, payment handling, reporting, and business logic calculations. It has 8+ methods and manages multiple data structures.
 
 ## 3. Duplicated Code
-**Location 1:** `smelly_program.py`, lines 110-120 (inside `process_customer_order...`)
+**Location 1:** `smelly_program.py`, lines 110-121 (inside `process_customer_order...`)
 **Location 2:** `smelly_program.py`, lines 225-239 (`validate_book_availability` method)
 **Location 3:** `smelly_program.py`, lines 241-255 (`calculate_shipping_cost_duplicate` method)
 **Justification:** Similar validation logic for book availability appears in multiple places, and shipping cost calculation is duplicated with slight variations.
