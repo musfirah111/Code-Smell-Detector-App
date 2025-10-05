@@ -22,12 +22,12 @@ long_method:
 
 # God Class (Blob) Detection Settings
 god_class:
-  # Maximum number of methods in a class
-  max_methods: 20
-  # Maximum number of fields/attributes in a class
-  max_fields: 15
-  # Maximum coupling (external dependencies)
-  max_coupling: 15
+  # ATFD (Access to Foreign Data) threshold
+  atfd_few: 2
+  # WMC (Weighted Method Count) threshold
+  wmc_very_high: 10
+  # TCC (Tight Class Cohesion) threshold
+  tcc_one_third: 0.6
 
 # Large Parameter List Detection Settings
 large_parameter_list:
@@ -47,13 +47,9 @@ magic_numbers:
 
 # Feature Envy Detection Settings
 feature_envy:
-
   min_sloc: 10
-  
-  atfd_threshol: 5
-
+  atfd_threshold: 5
   laa_threshold: 0.33
-
   fdp_threshold: 2
 
 # Report Generation Settings

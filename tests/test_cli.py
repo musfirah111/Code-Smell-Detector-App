@@ -7,7 +7,7 @@ from unittest.mock import patch, mock_open
 import tempfile
 import os
 from pathlib import Path
-from cli import parse_arguments, validate_files, parse_smell_list
+from backend.cli.cli import parse_arguments, validate_files, parse_smell_list
 
 class TestCLI(unittest.TestCase):
     """Test the CLI functionality."""

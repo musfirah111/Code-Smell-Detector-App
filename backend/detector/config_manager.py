@@ -91,7 +91,16 @@ class ConfigManager:
     
     def get_smell_config(self, smell_name: str) -> Dict[str, Any]:
         """Get configuration for a specific smell detector."""
-        smell_key = smell_name.lower().replace('class', '_class')
+        # Map smell names to config keys
+        smell_key_map = {
+            'LongMethod': 'long_method',
+            'GodClass': 'god_class',
+            'LargeParameterList': 'large_parameter_list',
+            'DuplicatedCode': 'duplicated_code',
+            'MagicNumbers': 'magic_numbers',
+            'FeatureEnvy': 'feature_envy'
+        }
+        smell_key = smell_key_map.get(smell_name, smell_name.lower())
         return self.config.get(smell_key, {})
     
     def save_config(self, output_path: str) -> None:

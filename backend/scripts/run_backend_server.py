@@ -11,9 +11,9 @@ from pathlib import Path
 # Add parent directory to path to import our modules
 sys.path.append(str(Path(__file__).parent.parent))
 
-from detector.smell_detector import CodeSmellDetector
-from detector.config_manager import ConfigManager
-from detector.report_generator import ReportGenerator
+from backend.detector.smell_detector import CodeSmellDetector
+from backend.detector.config_manager import ConfigManager
+from backend.detector.report_generator import ReportGenerator
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for Next.js frontend

@@ -4,12 +4,12 @@ Unit tests for the code smell detector engine.
 
 import unittest
 import ast
-from detector.smell_detector import (
+from backend.detector.smell_detector import (
     CodeSmellDetector, LongMethodDetector, GodClassDetector,
     DuplicatedCodeDetector, LargeParameterListDetector,
     MagicNumbersDetector, FeatureEnvyDetector
 )
-from detector.config_manager import ConfigManager
+from backend.detector.config_manager import ConfigManager
 
 class TestLongMethodDetector(unittest.TestCase):
     """Test the Long Method detector."""
@@ -83,22 +83,35 @@ class TestGodClassDetector(unittest.TestCase):
     
     def setUp(self):
         self.detector = GodClassDetector({
-            'max_methods': 5,
-            'max_fields': 5,
-            'max_coupling': 5
+            'atfd_few': 1,
+            'wmc_very_high': 1,
+            'tcc_one_third': 1.1
         })
     
     def test_detect_god_class_by_methods(self):
         """Test detection of classes with too many methods."""
         source_code = '''
 class GodClass:
-    def method1(self): pass
-    def method2(self): pass
-    def method3(self): pass
-    def method4(self): pass
-    def method5(self): pass
-    def method6(self): pass
-    def method7(self): pass
+    def method1(self, other):
+        # High complexity and foreign access
+        if other.field1 > 0:
+            if other.field2 > 0:
+                if other.field3 > 0:
+                    if other.field4 > 0:
+                        if other.field5 > 0:
+                            if other.field6 > 0:
+                                if other.field7 > 0:
+                                    if other.field8 > 0:
+                                        if other.field9 > 0:
+                                            if other.field10 > 0:
+                                                return other.field11
+        return other.field12
+    
+    def method2(self, other):
+        return other.field13 + other.field14
+    
+    def method3(self, other):
+        return other.field15 * other.field16
 '''
         tree = ast.parse(source_code)
         results = self.detector.detect('test.py', source_code, tree)
@@ -106,13 +119,12 @@ class GodClass:
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].smell_type, 'GodClass')
         self.assertEqual(results[0].details['class_name'], 'GodClass')
-        self.assertGreater(results[0].details['method_count'], 5)
     
     def test_detect_god_class_by_fields(self):
         """Test detection of classes with too many fields."""
         source_code = '''
 class GodClass:
-    def __init__(self):
+    def __init__(self, other):
         self.field1 = 1
         self.field2 = 2
         self.field3 = 3
@@ -120,13 +132,25 @@ class GodClass:
         self.field5 = 5
         self.field6 = 6
         self.field7 = 7
+        # High complexity method with foreign access
+        if other.field1 > 0:
+            if other.field2 > 0:
+                if other.field3 > 0:
+                    if other.field4 > 0:
+                        if other.field5 > 0:
+                            if other.field6 > 0:
+                                if other.field7 > 0:
+                                    if other.field8 > 0:
+                                        if other.field9 > 0:
+                                            if other.field10 > 0:
+                                                return other.field11
+        return other.field12
 '''
         tree = ast.parse(source_code)
         results = self.detector.detect('test.py', source_code, tree)
         
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].smell_type, 'GodClass')
-        self.assertGreater(results[0].details['field_count'], 5)
     
     def test_normal_class_not_detected(self):
         """Test that normal classes are not flagged."""
@@ -221,8 +245,9 @@ class TestFeatureEnvyDetector(unittest.TestCase):
     def setUp(self):
         self.detector = FeatureEnvyDetector({
             'min_sloc': 5,
-            'foreign_access_ratio': 1.5,
-            'min_foreign_accesses': 2
+            'atfd_threshold': 2,
+            'laa_threshold': 0.5,
+            'fdp_threshold': 1
         })
     
     def test_detect_feature_envy(self):
