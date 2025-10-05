@@ -16,7 +16,7 @@ smells:
 # Long Method Detection Settings
 long_method:
   # Source Lines of Code threshold
-  sloc: 30
+  sloc: 20
   # Cyclomatic complexity threshold
   cyclomatic: 12
 
@@ -32,16 +32,11 @@ god_class:
 # Large Parameter List Detection Settings
 large_parameter_list:
   # Maximum number of parameters (excluding self)
-  params: 6
+  params: 5
 
 # Duplicated Code Detection Settings
 duplicated_code:
-  # Shingle size for text comparison
-  shingle_size: 30
-  # Similarity threshold (0.0 to 1.0)
-  similarity: 0.90
-  # Minimum chunk size in tokens
-  min_chunk_tokens: 80
+  min_block_lines: 3
 
 # Magic Numbers Detection Settings
 magic_numbers:
@@ -52,12 +47,14 @@ magic_numbers:
 
 # Feature Envy Detection Settings
 feature_envy:
-  # Minimum method size to analyze
+
   min_sloc: 10
-  # Ratio of foreign to self accesses
-  foreign_access_ratio: 1.5
-  # Minimum foreign accesses to trigger
-  min_foreign_accesses: 3
+  
+  atfd_threshol: 5
+
+  laa_threshold: 0.33
+
+  fdp_threshold: 2
 
 # Report Generation Settings
 report:

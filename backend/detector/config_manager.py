@@ -19,19 +19,16 @@ class ConfigManager:
             'FeatureEnvy': True
         },
         'long_method': {
-            'sloc': 30,
+            'sloc': 20,
             'cyclomatic': 12
         },
         'god_class': {
-            'max_methods': 20,
-            'max_fields': 15,
-            'max_coupling': 15,
             'atfd_few': 2,
             'wmc_very_high': 10,
             'tcc_one_third': 0.6
         },
         'large_parameter_list': {
-            'params': 6
+            'params': 5
         },
         'duplicated_code': {
             'min_block_lines': 3
@@ -42,8 +39,6 @@ class ConfigManager:
         },
         'feature_envy': {
             'min_sloc': 10,
-            'foreign_access_ratio': 1.5,
-            'min_foreign_accesses': 3,
             'atfd_threshold': 5,
             'laa_threshold': 0.33,
             'fdp_threshold': 2
